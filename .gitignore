@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Streamlit local secrets — never commit
+.streamlit/secrets.toml
+
+# venv / editor / OS
+.venv/
+venv/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# local DuckDB / temp
+*.duckdb
+*.duckdb.wal
