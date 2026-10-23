@@ -21,11 +21,14 @@ st.set_page_config(page_title="Bookstore BI", layout="wide")
 
 
 def get_api_key():
-    try:
-        if "GROQ_API_KEY" in st.secrets:
-            return st.secrets["GROQ_API_KEY"]
-    except Exception:
-        pass
+    local = Path(".streamlit") / "secrets.toml"
+    user  = Path.home() / ".streamlit" / "secrets.toml"
+    if local.exists() or user.exists():
+        try:
+            if "GROQ_API_KEY" in st.secrets:
+                return st.secrets["GROQ_API_KEY"]
+        except Exception:
+            pass
     return os.environ.get("GROQ_API_KEY")
 
 
