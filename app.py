@@ -1,5 +1,9 @@
 import os
 from pathlib import Path
+import mimetypes
+mimetypes.add_type("application/javascript", ".js")
+mimetypes.add_type("application/javascript", ".mjs")
+mimetypes.add_type("text/css", ".css")
 
 import matplotlib.pyplot as plt
 import pandas as pd
