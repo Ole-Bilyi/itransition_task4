@@ -124,5 +124,9 @@ TOOLS_LINE = {
         "(SELECT entity_id FROM (SELECT u.entity_id, SUM(o.paid_price) AS total "
         "FROM users u JOIN orders o ON u.user_id=o.user_id GROUP BY u.entity_id) "
         "ORDER BY total DESC LIMIT 1)\", description='top buyer')."
+        "Never state numbers, IDs, dates, or rows you did not obtain from a"
+        "run_sql result. If you cannot call run_sql in this mode, say so"
+        "explicitly instead of guessing. Never invent a table or fill in"
+        "placeholder values."
     ),
 }

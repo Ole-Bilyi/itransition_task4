@@ -238,32 +238,48 @@ def _smart_title(s: str) -> str:
 
 
 def _author_popularity(orders: pd.DataFrame, books: pd.DataFrame) -> pd.DataFrame:
+    empty = pd.DataFrame(columns=["label", "units"])
+    if orders.empty or books.empty:
+        return empty
+
     pairs = (
         books[["book_id", "authors"]]
         .explode("authors")
         .dropna(subset=["authors"])
         .rename(columns={"authors": "author"})
     )
-    individual = (
-        orders.merge(pairs, on="book_id", how="inner")
-        .groupby("author", as_index=False)
-        .agg(units=("quantity", "sum"))
-        .rename(columns={"author": "label"})
-    )
+    if pairs.empty:
+        individual = empty.copy()
+    else:
+        individual = (
+            orders.merge(pairs, on="book_id", how="inner")
+            .groupby("author", as_index=False)
+            .agg(units=("quantity", "sum"))
+            .rename(columns={"author": "label"})
+        )
 
     book_to_set = dict(zip(books["book_id"], books["authors"].apply(_authorset)))
     enriched = orders.assign(author_set=orders["book_id"].map(book_to_set))
-    enriched = enriched[
-        enriched["author_set"].apply(lambda s: isinstance(s, frozenset) and len(s) > 1)
-    ]
-    sets = (
-        enriched.groupby("author_set", as_index=False)
-        .agg(units=("quantity", "sum"))
+
+    if "author_set" not in enriched.columns or enriched.empty:
+        return individual if not individual.empty else empty
+
+    mask = enriched["author_set"].apply(
+        lambda s: isinstance(s, frozenset) and len(s) > 1
     )
-    sets["label"] = sets["author_set"].apply(
-        lambda s: ", ".join(sorted(_smart_title(a) for a in s))
-    )
-    sets = sets[["label", "units"]]
+    enriched = enriched[mask].copy()
+
+    if enriched.empty:
+        sets = empty.copy()
+    else:
+        sets = (
+            enriched.groupby("author_set", as_index=False)
+            .agg(units=("quantity", "sum"))
+        )
+        sets["label"] = sets["author_set"].apply(
+            lambda s: ", ".join(sorted(_smart_title(a) for a in s))
+        )
+        sets = sets[["label", "units"]]
 
     return (
         pd.concat([individual, sets], ignore_index=True)

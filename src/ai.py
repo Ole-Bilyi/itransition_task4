@@ -5,7 +5,7 @@ import urllib.request
 from pathlib import Path
 
 import duckdb
-from openai import BadRequestError
+from openai import APIError
 from .tools import RUN_SQL_TOOL, CREATE_VIEW_TOOL, CREATE_SEMANTIC_VIEW_TOOL, REMOVE_VIEW_TOOL, SYSTEM_BASE, TOOLS_LINE
 
 ID_COL = {"users": "user_id", "books": "book_id", "orders": "order_id"}
@@ -21,11 +21,33 @@ _FORBIDDEN = re.compile(
     re.IGNORECASE,
 )
 
-_NAMES_CACHE = Path(__file__).parent / f"_names_cache_v1.txt"
+_NAMES_CACHE = Path(__file__).parent / "_names_cache_v1.txt"
 _NAMES_URLS = (
     "https://raw.githubusercontent.com/smashew/NameDatabases/master/NamesDatabases/first%20names/us.txt",
     "https://raw.githubusercontent.com/smashew/NameDatabases/master/NamesDatabases/surnames/us.txt",
 )
+_NAME_STOPWORDS = frozenset({
+    "the", "of", "and", "a", "an", "in", "on", "at", "to", "for", "with",
+    "is", "it", "as", "by", "or", "be", "no", "not", "so", "up", "we", "my",
+    "way", "wall", "war", "world", "life", "death", "love", "light", "dark",
+    "fire", "water", "earth", "air", "sun", "moon", "star", "sea", "sky",
+    "day", "night", "time", "year", "house", "home", "land", "city", "town",
+    "king", "queen", "lord", "lady", "god", "man", "woman", "men", "women",
+    "boy", "girl", "son", "daughter", "father", "mother", "brother", "sister",
+    "all", "one", "two", "three", "first", "last", "new", "old", "young",
+    "good", "bad", "great", "small", "big", "long", "short", "high", "low",
+    "hand", "heart", "head", "eyes", "eye", "face", "name", "word", "song",
+    "story", "book", "road", "door", "gate", "bridge", "river", "mountain",
+    "tree", "flower", "bird", "fish", "dog", "cat", "horse",
+    "rain", "snow", "wind", "storm", "cloud", "stone", "rock", "iron", "gold",
+    "silver", "black", "white", "red", "blue", "green", "yellow",
+    "south", "north", "east", "west", "here", "there", "where", "when",
+    "what", "who", "why", "how", "which", "this", "that", "these", "those",
+    "will", "bill", "mark", "art", "ray", "don", "dan", "chase", "cash",
+    "hunter", "jack", "grace", "hope", "faith", "rose", "may", "june",
+    "summer", "winter", "spring", "autumn", "fall", "dawn", "eve", "noon",
+    "victory", "joy", "peace", "glory", "honor", "pride",
+})
 _TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z'\-]+")
 
 _PERSON_PREDICATE_RE = re.compile(
@@ -74,7 +96,7 @@ def _load_names() -> set[str]:
 def _text_contains_person_name(text: str, names: set[str]) -> bool:
     for match in _TOKEN_RE.finditer(text):
         token = match.group().lower()
-        if token in names:
+        if token in names and token not in _NAME_STOPWORDS:
             return True
     return False
 
@@ -338,10 +360,10 @@ def _append_tool_call(messages: list, trace: list, call, ctx: dict) -> None:
 def _step(messages, tools, model, ctx, trace):
     try:
         msg = _chat(ctx["client"], messages, tools, model)
-    except BadRequestError:
+    except APIError as exc:
         return (
-            "The model tried to call a tool that isn't available in this mode. "
-            "Try rephrasing — e.g. 'filter the dashboard so only the top buyer remains'."
+            f"The LLM call failed ({type(exc).__name__}). Try rephrasing — "
+            "e.g. 'filter the dashboard so only the top buyer remains'."
         )
     messages.append(msg)
     if not msg.tool_calls:
